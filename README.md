@@ -9,4 +9,4 @@
 
 ## 在线访问
 
-启用 GitHub Pages 后访问:`https://<你的用户名>.github.io/<仓库名>/`
+启用 GitHub Pages 后访问:`[https://<paisleya11y>.github.io/<ai-tutor-prompt-demo>/](https://github.com/paisleya11y/ai-tutor-prompt-demo.git)`
