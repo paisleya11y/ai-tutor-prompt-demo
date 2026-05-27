@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>解析几何动态演示 · CD 过定点 (3/2, 0)</title>
+<style>
+  :root { color-scheme: light; }
+  body {
+    font-family: "KaiTi", "STKaiti", "楷体", "Times New Roman", serif;
+    background: #fafaf7;
+    color: #1a1a1a;
+    max-width: 980px;
+    margin: 24px auto;
+    padding: 0 18px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; color: #2c3e50; font-size: 22px; margin-bottom: 4px; }
+  .subtitle { text-align: center; color: #888; margin-bottom: 18px; font-size: 14px; }
+  .stage { background: white; border: 1px solid #ddd; border-radius: 8px; padding: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); }
+  .controls { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; padding: 12px; background: #f3f1ec; border-radius: 6px; margin-bottom: 12px; }
+  .controls label { font-weight: bold; color: #2c3e50; font-size: 14px; }
+  .controls input[type=range] { width: 240px; }
+  .readout { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 14px; border-radius: 4px; font-family: "Times New Roman", serif; font-size: 14px; }
+  .readout .eq { color: #27ae60; font-weight: bold; }
+  svg { display: block; margin: 0 auto; max-width: 100%; height: auto; background: white; }
+  .insight { background: #f9f4f3; border-left: 4px solid #c0392b; padding: 10px 14px; margin-top: 14px; border-radius: 4px; font-size: 14px; }
+  .legend { font-size: 12px; color: #555; margin-top: 6px; text-align: center; }
+  button { background: #2c3e50; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 13px; }
+  button:hover { background: #34495e; }
+  .trail { stroke: #e67e22; stroke-width: 1; fill: none; opacity: 0.22; }
+</style>
+</head>
+<body>
+
+<h1>解析几何 · 动态演示</h1>
+<div class="subtitle">2020 全国 I 卷理科第 20 题 ─ 拖动滑块改变 P 的纵坐标 t,直观感受「直线 CD 永远过定点 (3/2, 0)」</div>
+
+<div class="stage">
+
+<div class="controls">
+  <div>
+    <label>P(6, t) 的 t 值:</label><br>
+    <input id="tval" type="range" min="-3" max="3" step="0.02" value="1.5">
+    <span id="tShow" style="font-family: 'Times New Roman'; font-weight: bold;">1.50</span>
+  </div>
+  <button onclick="animateT()">▶ 自动扫描 t</button>
+  <button onclick="toggleTrail()">显示/隐藏 CD 轨迹</button>
+  <button onclick="reset()">重置</button>
+</div>
+
+<svg id="canvas" viewBox="0 0 760 420" width="760" height="420">
+  <defs>
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#eee" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="760" height="420" fill="url(#grid)" />
+
+  <!-- axes: origin at (200, 210), scale 60 px/unit -->
+  <line x1="0" y1="210" x2="760" y2="210" stroke="#888" stroke-width="1"/>
+  <line x1="200" y1="0" x2="200" y2="420" stroke="#888" stroke-width="1"/>
+
+  <text x="750" y="225" font-family="Times New Roman" font-size="13" fill="#555">x</text>
+  <text x="186" y="14" font-family="Times New Roman" font-size="13" fill="#555">y</text>
+  <text x="205" y="225" font-family="Times New Roman" font-size="11" fill="#888">O</text>
+
+  <!-- vertical line x = 6 (where P lives): screen x = 200 + 6*60 = 560 -->
+  <line x1="560" y1="0" x2="560" y2="420" stroke="#9b59b6" stroke-width="1.2" stroke-dasharray="4 4" opacity="0.6"/>
+  <text x="565" y="20" font-family="Times New Roman" font-size="12" fill="#9b59b6">x = 6</text>
+
+  <!-- ellipse: x²/9 + y² = 1, rx = 3*60 = 180, ry = 1*60 = 60 -->
+  <ellipse cx="200" cy="210" rx="180" ry="60" fill="none" stroke="#2c3e50" stroke-width="2.2"/>
+
+  <!-- group for CD trajectory trails -->
+  <g id="trails"></g>
+
+  <!-- dynamic lines -->
+  <line id="linePA" stroke="#27ae60" stroke-width="1.4" opacity="0.85"/>
+  <line id="linePB" stroke="#27ae60" stroke-width="1.4" opacity="0.85"/>
+  <line id="lineCD" stroke="#e67e22" stroke-width="2.4" opacity="0.95"/>
+
+  <!-- fixed points: A(-3,0) screen x = 200 - 180 = 20; B(3,0) screen x = 380 -->
+  <g>
+    <circle cx="20" cy="210" r="5" fill="#c0392b"/>
+    <text x="6" y="200" font-family="Times New Roman" font-size="13" font-weight="bold" fill="#c0392b">A</text>
+  </g>
+  <g>
+    <circle cx="380" cy="210" r="5" fill="#c0392b"/>
+    <text x="385" y="225" font-family="Times New Roman" font-size="13" font-weight="bold" fill="#c0392b">B</text>
+  </g>
+
+  <!-- the fixed point Q(3/2, 0): screen x = 200 + 1.5*60 = 290 -->
+  <g>
+    <circle cx="290" cy="210" r="8" fill="none" stroke="#c0392b" stroke-width="2"/>
+    <circle cx="290" cy="210" r="3" fill="#c0392b"/>
+    <text x="262" y="240" font-family="Times New Roman" font-size="13" font-weight="bold" fill="#c0392b">Q(3/2, 0)</text>
+  </g>
+
+  <!-- moving points -->
+  <circle id="ptP" r="6" fill="#9b59b6"/>
+  <text id="lblP" font-family="Times New Roman" font-size="13" font-weight="bold" fill="#9b59b6">P</text>
+
+  <circle id="ptC" r="5" fill="#2c3e50"/>
+  <text id="lblC" font-family="Times New Roman" font-size="13" font-weight="bold" fill="#2c3e50">C</text>
+
+  <circle id="ptD" r="5" fill="#2c3e50"/>
+  <text id="lblD" font-family="Times New Roman" font-size="13" font-weight="bold" fill="#2c3e50">D</text>
+
+  <text x="380" y="20" text-anchor="middle" font-family="Times New Roman" font-size="13" fill="#2c3e50">
+    Ellipse E: x²/9 + y² = 1     P(6, t)     A(-3,0), B(3,0)
+  </text>
+</svg>
+
+<div class="legend">
+  <span style="color:#2c3e50;">━ 椭圆 E</span>
+  <span style="color:#9b59b6;">┄┄ 动直线 x = 6</span>
+  <span style="color:#27ae60;">━ PA、PB</span>
+  <span style="color:#e67e22;">━ 直线 CD</span>
+  <span style="color:#c0392b;">○ 定点 Q(3/2, 0)</span>
+</div>
+
+<div id="readout" class="readout" style="margin-top: 12px;">
+  <div>P = (6, <span id="tOut">1.50</span>) &nbsp;
+       C = (<span id="cOut"></span>) &nbsp;
+       D = (<span id="dOut"></span>)</div>
+  <div>当 x = 3/2 时,直线 CD 的 y 值 = <span id="yAtQ"></span>
+       <span id="status" class="eq"></span></div>
+</div>
+
+<div class="insight">
+  <strong>关键洞察(辅导时应让学生自己发现):</strong>
+  拖动滑块改变 t,无论 P 移动到 x=6 上的哪个位置,
+  橙色的直线 CD 始终穿过红圈标记的 Q(3/2, 0)。
+  <br><br>
+  这就是这道题的<strong>命题意图</strong>——「定点」隐藏在参数化表达的背后。
+  学生硬算到 C、D 坐标后,如果没有「猜定点 → 验证三点共线」这个翻译动作,
+  就会陷在「k_CD 是 t 的复杂函数」里不知道下一步往哪走。
+  动图能让学生先<em>看到</em>定点的存在,再去用代数验证。
+</div>
+
+</div>
+
+<script>
+// Math: x²/9 + y² = 1, A(-3,0), B(3,0), P(6,t), Q_fixed = (3/2, 0)
+// Screen: viewBox 760x420, origin at (200, 210), scale 60 px/unit
+const SCALE = 60;
+const OX = 200, OY = 210;
+function toScreen(x, y) { return [OX + x * SCALE, OY - y * SCALE]; }
+
+// Closed-form (from the standard solution):
+//   x_C = (27 - 3t²) / (9 + t²),  y_C =  6t / (9 + t²)
+//   x_D = (3t² - 3) / (1 + t²),   y_D = -2t / (1 + t²)
+function compute(t) {
+  return {
+    C: [(27 - 3*t*t) / (9 + t*t), (6*t) / (9 + t*t)],
+    D: [(3*t*t - 3) / (1 + t*t), (-2*t) / (1 + t*t)]
+  };
+}
+
+// y on line CD at given x (returns null if vertical)
+function yOnCD_at(x, C, D) {
+  const dx = D[0] - C[0];
+  if (Math.abs(dx) < 1e-9) return null;
+  const k = (D[1] - C[1]) / dx;
+  return C[1] + k * (x - C[0]);
+}
+
+function setLine(id, x1, y1, x2, y2) {
+  const el = document.getElementById(id);
+  const [px1, py1] = toScreen(x1, y1);
+  const [px2, py2] = toScreen(x2, y2);
+  el.setAttribute('x1', px1); el.setAttribute('y1', py1);
+  el.setAttribute('x2', px2); el.setAttribute('y2', py2);
+}
+
+function setPt(circleId, labelId, x, y, dx, dy) {
+  const c = document.getElementById(circleId);
+  const t = document.getElementById(labelId);
+  const [px, py] = toScreen(x, y);
+  c.setAttribute('cx', px); c.setAttribute('cy', py);
+  const [tx, ty] = toScreen(x + dx, y + dy);
+  t.setAttribute('x', tx); t.setAttribute('y', ty);
+}
+
+function extendLine(p1, p2, xMin, xMax) {
+  const dx = p2[0] - p1[0];
+  if (Math.abs(dx) < 1e-9) {
+    return [[p1[0], -3.5], [p1[0], 3.5]];
+  }
+  const k = (p2[1] - p1[1]) / dx;
+  return [[xMin, p1[1] + k * (xMin - p1[0])], [xMax, p1[1] + k * (xMax - p1[0])]];
+}
+
+let showTrails = true;
+
+function update(t) {
+  const { C, D } = compute(t);
+  const P = [6, t];
+
+  // Lines PA, PB through to P
+  const PAext = extendLine([-3, 0], P, -3.2, 6.5);
+  setLine('linePA', PAext[0][0], PAext[0][1], PAext[1][0], PAext[1][1]);
+
+  const PBext = extendLine([3, 0], P, 0, 6.5);
+  setLine('linePB', PBext[0][0], PBext[0][1], PBext[1][0], PBext[1][1]);
+
+  // Line CD spanning x ∈ [-2.5, 6.5] so its passage through (3/2, 0) is visible
+  const CDext = extendLine(C, D, -2.5, 6.5);
+  setLine('lineCD', CDext[0][0], CDext[0][1], CDext[1][0], CDext[1][1]);
+
+  setPt('ptP', 'lblP', P[0], P[1], 0.15, 0.18);
+  setPt('ptC', 'lblC', C[0], C[1], 0.15, 0.20);
+  setPt('ptD', 'lblD', D[0], D[1], 0.15, -0.18);
+
+  document.getElementById('tOut').textContent = t.toFixed(2);
+  document.getElementById('cOut').textContent = `${C[0].toFixed(3)}, ${C[1].toFixed(3)}`;
+  document.getElementById('dOut').textContent = `${D[0].toFixed(3)}, ${D[1].toFixed(3)}`;
+
+  const yAtQ = yOnCD_at(1.5, C, D);
+  const yStr = yAtQ === null ? 'CD 竖直 (x=3/2 仍在线上 ✓)' : yAtQ.toFixed(5);
+  document.getElementById('yAtQ').textContent = yStr;
+  const st = document.getElementById('status');
+  if (yAtQ === null) {
+    // CD is vertical — must verify x_C = 3/2
+    if (Math.abs(C[0] - 1.5) < 1e-3) st.textContent = '✓ 过 Q(3/2, 0)';
+    else st.textContent = '';
+  } else if (Math.abs(yAtQ) < 1e-3) {
+    st.textContent = '✓ 过 Q(3/2, 0)';
+  } else {
+    st.textContent = '';
+  }
+}
+
+function addTrail(t) {
+  if (!showTrails) return;
+  const { C, D } = compute(t);
+  const CDext = extendLine(C, D, -2.5, 6.5);
+  const [x1, y1] = toScreen(CDext[0][0], CDext[0][1]);
+  const [x2, y2] = toScreen(CDext[1][0], CDext[1][1]);
+  const ns = 'http://www.w3.org/2000/svg';
+  const line = document.createElementNS(ns, 'line');
+  line.setAttribute('class', 'trail');
+  line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+  line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+  document.getElementById('trails').appendChild(line);
+}
+
+function clearTrails() {
+  document.getElementById('trails').innerHTML = '';
+}
+
+function toggleTrail() {
+  showTrails = !showTrails;
+  if (!showTrails) clearTrails();
+}
+
+let animTimer = null;
+function animateT() {
+  if (animTimer) { clearInterval(animTimer); animTimer = null; return; }
+  clearTrails();
+  showTrails = true;
+  let t = -2.6;
+  animTimer = setInterval(() => {
+    t += 0.08;
+    if (t > 2.6) { clearInterval(animTimer); animTimer = null; return; }
+    document.getElementById('tval').value = t.toFixed(2);
+    document.getElementById('tShow').textContent = t.toFixed(2);
+    addTrail(t);
+    update(t);
+  }, 80);
+}
+
+function reset() {
+  if (animTimer) { clearInterval(animTimer); animTimer = null; }
+  clearTrails();
+  document.getElementById('tval').value = 1.5;
+  document.getElementById('tShow').textContent = '1.50';
+  update(1.5);
+}
+
+document.getElementById('tval').addEventListener('input', e => {
+  const t = parseFloat(e.target.value);
+  document.getElementById('tShow').textContent = t.toFixed(2);
+  update(t);
+});
+
+update(1.5);
+</script>
+
+</body>
+</html>
